@@ -1,0 +1,579 @@
+#pragma region VEXcode Generated Robot Configuration
+// Make sure all required headers are included.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+#include <string.h>
+
+
+#include "vex.h"
+
+using namespace vex;
+
+// Brain should be defined by default
+brain Brain;
+
+
+// START IQ MACROS
+#define waitUntil(condition)                                                   \
+  do {                                                                         \
+    wait(5, msec);                                                             \
+  } while (!(condition))
+
+#define repeat(iterations)                                                     \
+  for (int iterator = 0; iterator < iterations; iterator++)
+// END IQ MACROS
+
+
+// Robot configuration code.
+inertial BrainInertial = inertial();
+motor UPDOWNMotorA = motor(PORT5, false);
+motor UPDOWNMotorB = motor(PORT11, true);
+motor_group UPDOWN = motor_group(UPDOWNMotorA, UPDOWNMotorB);
+
+controller Controller = controller();
+motor armMotorA = motor(PORT4, false);
+motor armMotorB = motor(PORT10, true);
+motor_group arm = motor_group(armMotorA, armMotorB);
+
+pneumatic Pneumatic1 = pneumatic(PORT1);
+motor leftM = motor(PORT6, true);
+motor rightM = motor(PORT12, false);
+distance leftdistance = distance(PORT2);
+distance rightdistance = distance(PORT3);
+touchled TouchLED7 = touchled(PORT7);
+
+
+// generating and setting random seed
+void initializeRandomSeed(){
+  wait(100,msec);
+  double xAxis = BrainInertial.acceleration(xaxis) * 1000;
+  double yAxis = BrainInertial.acceleration(yaxis) * 1000;
+  double zAxis = BrainInertial.acceleration(zaxis) * 1000;
+  // Combine these values into a single integer
+  int seed = int(
+    xAxis + yAxis + zAxis
+  );
+  // Set the seed
+  srand(seed); 
+}
+
+
+
+void vexcodeInit() {
+
+  // Initializing random seed.
+  initializeRandomSeed(); 
+}
+
+
+// define variable for remote controller enable/disable
+bool RemoteControlCodeEnabled = true;
+
+#pragma endregion VEXcode Generated Robot Configuration
+
+//----------------------------------------------------------------------------
+//                                                                            
+//    Module:       main.cpp                                                  
+//    Author:       {author}                                                  
+//    Created:      {date}                                                    
+//    Description:  IQ project                                                
+//                                                                            
+//----------------------------------------------------------------------------
+
+// Include the IQ Library
+#include "iq_cpp.h"
+
+// Allows for easier use of the VEX Library
+using namespace vex;
+int claw=0,upclaw=0;
+int chasiss();int cha,chc;int armstate=1;
+int ctchas=1,autostate=0;
+int doublepin=0;
+void move(int a,int c);
+int breakauto=0;
+int autorun();
+int side=0;//默认蓝色方
+void run_dir_speed(double degree,double speed);
+double kp=0.7,ki=0.001,kd=0.8,err,integ,deri,lasterr,pid;
+void run_dir_speed_dis(double degree,double speed,double dis,bool st=true);
+void run_dir_speed_time(double degree,double speed,double time,bool st=true);
+void turnto(int degree);
+double tkp=0.8 ,tki=0.004,tkd=0.6,terr,tinteg,tderi,tlasterr,tpid;
+void armslowto();void delay(double t);
+int upmini=2;
+int main() {
+  // Initializing Robot Configuration. DO NOT REMOVE!
+  vexcodeInit();
+  Pneumatic1.pumpOff();
+  BrainInertial.calibrate();
+  while(BrainInertial.isCalibrating())
+  {wait(1,msec);}
+  Pneumatic1.pumpOn();
+  arm.setStopping(brake);
+  leftM.setStopping(brake);
+  rightM.setStopping(brake);
+  arm.setPosition(0,degrees);
+  UPDOWN.setStopping(brake);
+  UPDOWN.setPosition(0,degrees);
+  arm.setPosition(0,degrees);
+  vex::task ctchass(chasiss);
+  vex::task autor(autorun);
+  // Begin project code
+  Pneumatic1.extend(cylinder2);
+  Pneumatic1.retract(cylinder1);
+  Pneumatic1.pumpOn();
+  
+  while(1)
+  {
+    Brain.Screen.printAt(60,20,"%d",claw);
+    Brain.Screen.printAt(100,20,"%d",doublepin);
+    if(Controller.ButtonFDown.pressing()==1)
+    {
+      Brain.Timer.reset();
+      while(Controller.ButtonFDown.pressing()==1)
+      {
+        wait(1,msec);
+        if(Brain.Timer.value()>0.5)
+        {
+          doublepin+=1;
+          if (doublepin%2==1)
+          {
+            TouchLED7.setColor(yellow);
+          }
+          else 
+          {
+            TouchLED7.setColor(green);
+          }
+          while(Controller.ButtonFDown.pressing()==1)
+          {
+            wait(1,msec);
+          }
+        }
+      }
+      
+    }
+    wait(5,msec);
+    if (Controller.ButtonLDown.pressing()&&armMotorA.position(degrees)>0)
+    {
+      if(doublepin%2==0)
+        {
+          arm.setStopping(brake);
+          arm.setVelocity(-80,percent);
+          arm.spinToPosition(0,degrees,false);
+          armstate=1;
+        }
+        else 
+        {
+          arm.setVelocity(-40,percent);
+          arm.spinToPosition(0,degrees,false);
+        }
+    }
+    else if(Controller.ButtonLUp.pressing())
+    {
+      if(arm.position(degrees)<540)
+      {
+        arm.setStopping(hold);
+      }
+      else 
+      {
+        arm.setStopping(brake);
+      }
+      if(arm.position(degrees)<260)
+      {//
+        if(doublepin%2==0)
+          {arm.spin(forward,100,percent);}//speed -> 100
+        else 
+        {
+          arm.spin(forward,50,percent);
+          arm.spinToPosition(140,degrees,true);
+        }
+      }
+      else 
+      {
+        arm.spin(forward,50,percent);
+      }
+    }
+    else 
+    {
+      if(UPDOWN.position(degrees)>130&&arm.position(degrees)>230)
+      {
+        arm.setVelocity(100,percent);
+        arm.spinToPosition(230,degrees,true);
+      }
+      else if(autostate==0)
+      {
+        arm.stop();
+      }
+    }
+    if (Controller.ButtonEUp.pressing())
+    {
+      while(Controller.ButtonEUp.pressing())
+      {wait(5,msec);}
+      if(doublepin%2==1&&claw%2==1&&arm.position(degrees)<20)
+      {
+        Pneumatic1.extend(cylinder1);
+        wait(0.7,seconds);  
+      }
+      claw+=1;
+    }
+    if (claw%2==0)
+    {
+        Pneumatic1.extend(cylinder1);
+    }
+    if((claw%2==0&&ctchas==1&&doublepin%2==1&&(leftdistance.objectDistance(mm)<85||rightdistance.objectDistance(mm)<85)&&arm.position(degrees)<15&&arm.velocity(percent)==0))
+    {
+      ctchas=0;
+      move(30,30);
+      wait(0.25,seconds);
+      Pneumatic1.retract(cylinder1);
+      claw=1;
+      ctchas=1;
+    }
+    else if(claw%2==1||(leftdistance.objectDistance(mm)<85&&rightdistance.objectDistance(mm)<85&&arm.position(degrees)<15&&arm.velocity(percent)==0))
+    {
+      
+      Pneumatic1.retract(cylinder1);
+      claw=1;
+    }
+    if (Controller.ButtonFUp.pressing())
+    {
+      while(Controller.ButtonFUp.pressing()==1)
+      {wait(5,msec);}
+      upclaw+=1;
+      if (upclaw%2==1)
+      {
+        Pneumatic1.retract(cylinder2);
+        wait(0.2,seconds);
+        upmini=1;
+      }
+      else 
+      {
+        Pneumatic1.extend(cylinder2);
+        wait(0.2,seconds);
+        upmini=0;
+      } 
+    }
+    
+  }
+}
+int chasiss()
+{
+  TouchLED7.setColor(blue);
+  while(1)
+  {
+    wait(5,msec);
+    if (Controller.ButtonEDown.pressing()==1)
+    {
+      Brain.Timer.reset();
+      while(Controller.ButtonEDown.pressing()==1)
+      {
+        wait(2,msec);
+        if(Brain.Timer.value()>0.5)
+        {
+          BrainInertial.setRotation(0,degrees);
+          doublepin=0;
+          autostate=1;
+        }
+      }
+      while(Brain.Timer.value()<0.5)
+      {
+        wait(1,msec);
+        if(Controller.ButtonEDown.pressing()==1)
+        {
+          while((Controller.ButtonEDown.pressing()==1))
+          {
+            wait(1,msec);
+          }
+          doublepin=0;
+          side+=1;
+          if(side%2==1)
+          {
+            TouchLED7.setColor(red);
+          }
+          else 
+          {
+            TouchLED7.setColor(blue);
+          }
+        }
+      }
+    }
+    if (fabs(Controller.AxisA.position())>30)
+    {
+      breakauto=1;
+    }
+    if (ctchas==1)
+    { 
+      if (fabs(Controller.AxisA.position())>12)
+      {
+        cha=Controller.AxisA.position();
+      }
+      else 
+      {
+        cha=0;
+      }
+      if (fabs(Controller.AxisC.position())>12)
+      {
+        chc=Controller.AxisC.position();
+      }
+      else 
+      {
+        chc=0;
+      }
+      leftM.spin(forward,cha+0.6*chc,percent);
+      rightM.spin(forward,cha-0.6*chc,percent);
+    }
+  }
+}
+int autorun()
+{
+  while(1)
+  {
+    if(Controller.ButtonRUp.pressing())
+    {
+      if(UPDOWN.position(degrees)<700)
+      {
+        UPDOWN.setVelocity(100,percent);
+      }
+      else 
+      {
+        UPDOWN.setVelocity(20,percent);
+      }
+      UPDOWN.spinToPosition(850,degrees,false);
+      UPDOWN.setStopping(hold);
+    }
+    else if (Controller.ButtonRDown.pressing())
+    {
+
+      if(UPDOWN.position(degrees)>100)
+      {
+        UPDOWN.setVelocity(-80,percent);
+      }
+      else 
+      {
+        UPDOWN.setVelocity(-40,percent);
+      }
+      UPDOWN.spinToPosition(0,degrees,false);
+      UPDOWN.setStopping(hold);
+    }
+    else 
+    {
+      if (upmini==1&&UPDOWN.position(degrees)<100)
+      {
+        UPDOWN.setVelocity(20,percent);
+        UPDOWN.spinToPosition(50,degrees,true);
+        upmini=2;
+      }
+      else if(upmini==0&&UPDOWN.position(degrees)<100)
+      {
+        UPDOWN.setVelocity(20,percent);
+        UPDOWN.spinToPosition(0,degrees,true);
+        upmini=2;
+      }
+      else if(autostate==0)
+      {
+        UPDOWN.stop();
+      }
+    }
+    wait(5,msec);
+    if (autostate==1)
+    {
+      ctchas=0;
+      if(side%2==0)
+      {
+        breakauto=0;
+        Pneumatic1.pumpOff();
+        wait(0.1,seconds);
+        BrainInertial.setRotation(0,degrees);
+        ctchas=0;
+        upclaw=0;
+        BrainInertial.setRotation(0,degrees);
+        UPDOWN.setVelocity(20,percent);
+        UPDOWN.spinToPosition(0,degrees,false);
+        Pneumatic1.extend(cylinder2);
+        run_dir_speed_dis(15,70,15,false);
+        run_dir_speed_dis(17,70,8,false);
+        claw=1;
+        run_dir_speed_dis(17,70,3.5,true);
+        Pneumatic1.pumpOn();
+        arm.spinToPosition(300,degrees,false);
+        run_dir_speed_dis(-72,50,14.5,true);
+        run_dir_speed_dis(-60,-35,2.5,true);
+        //leftM.spinFor(forward,-180,degrees,false);
+        //rightM.spinFor(forward,180,degrees,true);
+        turnto(-135);
+        run_dir_speed_time(-135,-80,1.1,true);
+        upclaw=1;
+        Pneumatic1.retract(cylinder2);
+        upclaw=1;
+        Pneumatic1.retract(cylinder2);
+        delay(0.1);
+        UPDOWN.spinToPosition(60,degrees,true);
+        arm.setVelocity(90,percent);
+        arm.spinToPosition(550,degrees,false);
+        run_dir_speed_dis(-135,40,4,true);
+        delay(0.3);
+        claw=0;
+        Pneumatic1.extend(cylinder1);
+        delay(0.1);
+        arm.setVelocity(80,percent);
+        arm.spinToPosition(0,degrees,false);
+        delay(0.3);
+        turnto(-85);
+        claw=0;
+        run_dir_speed_dis(-85,40,3,true);
+        claw=0;
+      }
+      else 
+      {
+        breakauto=0;
+        Pneumatic1.pumpOff();
+        BrainInertial.setRotation(0,degrees);
+        ctchas=0;
+        upclaw=0;
+        BrainInertial.setRotation(0,degrees);
+        UPDOWN.setVelocity(20,percent);
+        UPDOWN.spinToPosition(0,degrees,false);
+        Pneumatic1.extend(cylinder2);
+        run_dir_speed_dis(-15,70,15,false);
+        run_dir_speed_dis(-17,70,8,false);
+        claw=1;
+        run_dir_speed_dis(-17,70,3.5,true);
+        Pneumatic1.pumpOn();
+        arm.spinToPosition(300,degrees,false);
+        run_dir_speed_dis(72,50,14.5,true);
+        run_dir_speed_dis(60,-35,2.5,true);
+        //leftM.spinFor(forward,-180,degrees,false);
+        //rightM.spinFor(forward,180,degrees,true);
+        turnto(135);
+        run_dir_speed_time(135,-80,1.1,true);
+        upclaw=1;
+        Pneumatic1.retract(cylinder2);
+        upclaw=1;
+        Pneumatic1.retract(cylinder2);
+        delay(0.1);
+        UPDOWN.spinToPosition(60,degrees,true);
+        arm.setVelocity(90,percent);
+        arm.spinToPosition(550,degrees,false);
+        run_dir_speed_dis(135,40,4,true);
+        delay(0.3);
+        claw=0;
+        Pneumatic1.extend(cylinder1);
+        delay(0.1);
+        arm.setVelocity(80,percent);
+        arm.spinToPosition(0,degrees,false);
+        delay(0.3);
+        turnto(85);
+        claw=0;
+        run_dir_speed_dis(85,40,3,true);
+        claw=0;
+      }
+      autostate=0;
+      ctchas=1;
+    }
+  }
+}
+void run_dir_speed(double degree,double speed)
+{
+  wait(10,msec);
+  err=degree-BrainInertial.rotation(degrees);
+  if (fabs(err)>15||fabs(err)<2)
+  {
+    integ=0;
+  }
+  else 
+  {
+    integ+=err;
+  }
+
+  deri=err-lasterr;
+  pid = err*kp+integ*ki+deri*kd;
+  move(speed+pid,speed-pid);
+  lasterr=err;
+}
+void run_dir_speed_dis(double degree,double speed,double dis,bool st)
+{
+  integ=0;deri=0;lasterr=0;
+  leftM.setPosition(0,degrees);
+  rightM.setPosition(0,degrees);
+  while(fabs(leftM.position(degrees))+fabs(rightM.position(degrees))<dis*100)
+  {
+    run_dir_speed(degree,speed);
+    if(breakauto==1)
+    {
+      break;
+    }
+  }
+  if (st==true)
+  {
+    move(0,0);
+  }
+}
+void run_dir_speed_time(double degree,double speed,double time,bool st)
+{
+  Brain.Timer.reset();
+  while(Brain.Timer.value()<time)
+  {
+    run_dir_speed(degree,speed);
+    if(breakauto==1)
+    {
+      break;
+    }
+  }
+  if (st==true)
+  {
+    move(0,0);
+  }
+}
+void turnto(int degree)
+{
+  int count=0;
+  while(1)
+  {
+    if(breakauto==1)
+    {
+      break;
+    }
+    wait(10,msec);
+    terr=degree-BrainInertial.rotation(degrees);
+    if (fabs(terr)>20||fabs(terr)<3)
+    {
+      tinteg=0;
+    }
+    else 
+    {
+      tinteg+=terr;
+    }
+      if(fabs(terr)<3)
+    {
+      count+=1;
+      if (count>15)
+      {
+        break;
+      }
+    }
+    tderi=terr-tlasterr;
+    tpid = terr*tkp+tinteg*tki+tderi*tkd;
+    move(tpid,-tpid);
+    tlasterr=terr;
+  }
+  move(0,0);
+}
+void move(int a,int c)
+{
+  leftM.spin(forward,a,percent);
+  rightM.spin(forward,c,percent);
+}
+void delay(double t)
+{
+  Brain.Timer.reset();
+  while(Brain.Timer.value()<t)
+  {
+    wait(1,msec);
+    if(breakauto==1)
+    {
+      break;
+    }
+  }
+}
